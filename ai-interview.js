@@ -32,8 +32,44 @@ let questions = [];
 let currentAnalysis = null;
 let diagnoses = [];
 const state = { step: 'setup', questionIndex: 0, stage: 0, answers: [], startedAt: null };
+let demoMode = true;
+let modeRevision = 0;
+const localHost = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+
+function prepareDemo() {
+  currentAnalysis = structuredClone(interviewDemo.analysis);
+  questions = structuredClone(interviewDemo.questions);
+  diagnoses = structuredClone(interviewDemo.diagnoses);
+  state.questionIndex = 0; state.stage = 0; state.answers = [];
+}
+
+function setMode(demo) {
+  demoMode = demo;
+  modeRevision++;
+  prepareDemo();
+  resumeText.readOnly = jdText.readOnly = demo;
+  resumeText.value = demo ? sampleResume : '';
+  jdText.value = demo ? sampleJd : '';
+  resumeFile.disabled = demo;
+  $('.pdf-option').hidden = demo;
+  $('#demoReport').hidden = !demo;
+  $('#demoBanner strong').textContent = demo ? '演示模式 · 不消耗 Token' : '真实练习 · 调用 DeepSeek';
+  $('#demoBanner p').textContent = demo ? '虚构案例、预设追问与评分，用于展示产品流程，不分析你的个人回答。' : '填写自己的资料后由模型实时分析，会消耗本地配置的 API 额度。';
+  $('#liveMode').textContent = demo ? '切换真实练习（需本地服务）' : '返回免费演示';
+  $('#loadSample').textContent = demo ? '重置虚构示例' : '填入虚构资料（实时分析会消耗额度）';
+  analyzeButton.disabled = !demo;
+  analyzeButton.textContent = demo ? '体验演示案例 →' : '分析匹配关系 →';
+  formError.textContent = '';
+  $$('.privacy-note p, .mobile-privacy').forEach(el => el.textContent = demo ? '演示数据仅在浏览器展示，不发送简历或回答给模型。' : '输入会发送给模型完成分析；本项目服务端不持久化保存简历和回答。');
+  $('#apiStatus').textContent = demo ? '演示可用 · 无需 API Key' : '正在检查本地服务';
+  $('#apiStatus').classList.remove('is-error');
+  $('#analysisView').innerHTML = $('#interviewView').innerHTML = $('#reportView').innerHTML = '';
+  goTo('setup');
+  if (!demo) checkApi();
+}
 
 async function apiPost(path, body) {
+  if (demoMode) throw new Error('演示模式不调用模型');
   const response = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -49,14 +85,21 @@ async function apiPost(path, body) {
 }
 
 async function checkApi() {
+  const revision = modeRevision;
   const status = $('#apiStatus');
   try {
     const response = await fetch('/api/health', { cache: 'no-store' });
     if (!response.ok) throw new Error('服务不可用');
     const data = await response.json();
+    if (demoMode || revision !== modeRevision) return;
+    analyzeButton.disabled = !data.configured;
+    if (!data.configured) formError.textContent = '请先在本地配置 DeepSeek Key，或返回免费演示。';
     status.innerHTML = `<i></i> ${data.configured ? 'DeepSeek 已配置 · Key 待验证' : 'DeepSeek Key 未配置'}`;
     status.classList.toggle('is-error', !data.configured);
   } catch {
+    if (demoMode || revision !== modeRevision) return;
+    analyzeButton.disabled = true;
+    formError.textContent = '本地服务未连接。请启动项目服务后刷新，或返回免费演示。';
     const staticPreview = location.hostname.endsWith('.github.io');
     status.innerHTML = `<i></i> ${staticPreview ? 'GitHub Pages 静态预览' : '服务未启动'}`;
     status.classList.add('is-error');
@@ -67,7 +110,23 @@ async function checkApi() {
   }
 }
 
-checkApi();
+$('#liveMode').addEventListener('click', () => {
+  if (demoMode && !localHost) {
+    formError.textContent = '当前在线版本提供免费演示。真实练习需下载源码并在本地启动服务；无需向此页面提供 Key。';
+    goTo('setup');
+    return;
+  }
+  setMode(!demoMode);
+});
+$('#demoReport').addEventListener('click', () => {
+  if (!demoMode) return;
+  prepareDemo();
+  renderAnalysis();
+  renderInterview();
+  renderReport(structuredClone(interviewDemo.report));
+  goTo('report');
+});
+setMode(true);
 
 resumeFile?.addEventListener('change', () => {
   const file = resumeFile.files?.[0];
@@ -75,12 +134,14 @@ resumeFile?.addEventListener('change', () => {
 });
 
 $('#loadSample')?.addEventListener('click', () => {
+  if (demoMode) { setMode(true); return; }
   resumeText.value = sampleResume;
   jdText.value = sampleJd;
   formError.textContent = '';
 });
 
 analyzeButton?.addEventListener('click', async () => {
+  if (demoMode) { prepareDemo(); renderAnalysis(); goTo('analysis'); return; }
   if (!resumeText.value.trim() || !jdText.value.trim()) {
     formError.textContent = '请填写简历文本和岗位 JD；也可以先载入测试样本。';
     (!resumeText.value.trim() ? resumeText : jdText).focus();
@@ -170,7 +231,7 @@ function renderAnalysis() {
     <div class="view-heading compact-heading">
       <p>02 / EVIDENCE MAP</p>
       <h1 id="analysisTitle">先看匹配，<br>再决定问什么。</h1>
-      <span>以下结论由 AI 根据本次提交的简历与 JD 生成，请核对证据边界。</span>
+      <span>${demoMode ? '以下为虚构案例的预设匹配结果，用于说明问题如何关联经历与岗位要求。' : '以下结论由 AI 根据本次提交的简历与 JD 生成，请核对证据边界。'}</span>
     </div>
     <div class="analysis-summary">
       <div><small>目标岗位</small><strong>${escapeHtml(analysis?.target_role || 'AI 产品经理实习生')}</strong></div>
@@ -228,11 +289,11 @@ function renderInterview() {
           <h1 id="interviewTitle">${escapeHtml(state.stage ? q.followup : q.prompt)}</h1>
           ${state.stage ? `<div class="gap-alert"><span>发现的主要缺口</span><p>${escapeHtml(getGapText(state.questionIndex))}</p></div>` : ''}
         </div>
-        <label class="answer-label" for="answerText">你的回答</label>
-        <textarea id="answerText" class="answer-box" rows="9" placeholder="先讲真实情况；不确定的结果可以明确说明……"></textarea>
+        <label class="answer-label" for="answerText">${demoMode ? '虚构候选人的示例回答（只读，不评价访客）' : '你的回答'}</label>
+        <textarea id="answerText" class="answer-box" rows="9" ${demoMode ? 'readonly' : ''} placeholder="${demoMode ? '点击下方按钮查看示例回答，再继续体验。' : '先讲真实情况；不确定的结果可以明确说明……'}"></textarea>
         <div class="answer-actions">
-          ${q.sample ? '<button class="text-button" id="sampleAnswer" type="button">载入真实测试回答</button>' : '<span></span>'}
-          <div><span id="answerHint">建议 80—300 字</span><button class="primary-button" id="submitAnswer" type="button">${state.stage ? '完成本题' : '提交回答'} <span>→</span></button></div>
+          ${q.sample ? '<button class="text-button" id="sampleAnswer" type="button">查看示例回答</button>' : '<span></span>'}
+          <div><span id="answerHint">${demoMode ? '预设流程 · 无模型调用' : '建议 80—300 字'}</span><button class="primary-button" id="submitAnswer" type="button" ${demoMode ? 'disabled' : ''}>${demoMode ? (state.stage ? '查看示例反馈' : '查看为什么追问') : (state.stage ? '完成本题' : '提交回答')} <span>→</span></button></div>
         </div>
         <p class="form-error" id="answerError" role="alert"></p>
       </section>
@@ -247,6 +308,7 @@ function renderInterview() {
   $('#sampleAnswer')?.addEventListener('click', () => {
     $('#answerText').value = state.stage ? q.followupSample : q.sample;
     $('#answerError').textContent = '';
+    $('#submitAnswer').disabled = false;
   });
   $('#submitAnswer').addEventListener('click', submitAnswer);
 }
@@ -263,6 +325,13 @@ function getGapText(index) {
 }
 
 async function submitAnswer() {
+  if (demoMode) {
+    const q = questions[state.questionIndex];
+    state.answers.push({question:state.questionIndex,text:state.stage ? q.followupSample : q.sample});
+    if (!state.stage) { state.stage = 1; renderInterview(); }
+    else showQuestionResult();
+    return;
+  }
   const answer = $('#answerText').value.trim();
   if (answer.length < 20) {
     $('#answerError').textContent = '回答信息较少。请补充一个具体事实，或载入真实测试回答继续演示。';
@@ -321,7 +390,7 @@ function showQuestionResult() {
     <div class="question-result">
       <span class="result-kicker">QUESTION ${String(state.questionIndex + 1).padStart(2, '0')} / COMPLETE</span>
       <div class="score-orbit"><strong>${score.toFixed(1)}</strong><small>/ 5.0</small></div>
-      <h1>本题诊断已完成</h1>
+      <h1>${demoMode ? '示例反馈 · 预设评分' : '本题诊断已完成'}</h1>
       <div class="feedback-list">${feedback.map((item, index) => `<div><span>0${index + 1}</span><p>${escapeHtml(item)}</p></div>`).join('')}</div>
       <section class="coaching-panel">
         <div class="coaching-title"><span>REVIEW</span><strong>本题复盘</strong></div>
@@ -335,7 +404,7 @@ function showQuestionResult() {
         </details>` : ''}
       </section>
       <div class="result-actions">
-        <button class="text-button" id="reviewAgain" type="button">返回修改回答</button>
+        <button class="text-button" id="reviewAgain" type="button">${demoMode ? '回看示例回答' : '返回修改回答'}</button>
         <button class="primary-button" id="nextQuestion" type="button">${state.questionIndex === questions.length - 1 ? '生成能力报告' : '下一道问题'} <span>→</span></button>
       </div>
     </div>`;
@@ -353,6 +422,7 @@ function showQuestionResult() {
 
 
 async function generateReport() {
+  if (demoMode) { renderReport(structuredClone(interviewDemo.report)); goTo('report'); return; }
   const button = $('#nextQuestion');
   button.disabled = true;
   button.textContent = 'AI 正在生成完整报告…';
@@ -402,7 +472,7 @@ function renderReport(report) {
   $('#reportView').innerHTML = `
     <div class="report-header">
       <div><p>04 / REPORT</p><h1 id="reportTitle">${escapeHtml(quick.summary)}</h1></div>
-      <div class="overall-score"><small>综合表现</small><strong>${overall.toFixed(1)}</strong><span>/ 5.0</span><em>基于本次 5 道回答</em></div>
+      <div class="overall-score"><small>${demoMode ? '预设示例分数' : '综合表现'}</small><strong>${overall.toFixed(1)}</strong><span>/ 5.0</span><em>${demoMode ? '基于五组虚构问答' : '基于本次 5 道回答'}</em></div>
     </div>
     <div class="report-switch" role="tablist" aria-label="报告深度">
       <button class="is-active" type="button" role="tab" aria-selected="true" data-report-mode="quick">快速总结 <span>2分钟</span></button>
@@ -460,7 +530,7 @@ function renderReport(report) {
     });
   });
   $('#copySummary').addEventListener('click', async () => {
-    const summary = `AI面试陪练报告｜综合 ${overall.toFixed(1)}/5\n${quick.summary}\n优势：${quick.strongest_evidence.join('；')}\n缺口：${quick.main_gaps.join('；')}\n下一步：${quick.next_action}`;
+    const summary = `${demoMode ? '演示报告（虚构案例、预设评分，非访客评估）' : 'AI面试陪练报告'}｜综合 ${overall.toFixed(1)}/5\n${quick.summary}\n优势：${quick.strongest_evidence.join('；')}\n缺口：${quick.main_gaps.join('；')}\n下一步：${quick.next_action}`;
     try {
       await navigator.clipboard.writeText(summary);
       $('#toast').textContent = '报告摘要已复制';

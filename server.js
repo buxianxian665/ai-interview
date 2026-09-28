@@ -199,7 +199,7 @@ function isPublicFile(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (parts.length === 1) {
     if (['index.html', 'ai-interview.html'].includes(relative)) return true;
-    if (['script.js', 'ai-interview.js', 'ballpit.js', 'ballpit-three.js', 'glow-cursor.js'].includes(relative)) return true;
+    if (['script.js', 'ai-interview.js', 'ai-interview-demo.js', 'ballpit.js', 'ballpit-three.js', 'glow-cursor.js'].includes(relative)) return true;
     return ['.css', '.png', '.jpg', '.jpeg', '.svg', '.webp', '.ico'].includes(ext);
   }
   return parts[0] === 'assets' && ['.png', '.jpg', '.jpeg', '.svg', '.webp', '.ico', '.woff', '.woff2'].includes(ext);

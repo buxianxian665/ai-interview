@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="面向 AI 产品经理实习候选人的个性化文本面试陪练。">
   <title>AI 面试陪练｜张睿阳</title>
-  <link rel="stylesheet" href="ai-interview.css?v=20260914-light">
+  <link rel="stylesheet" href="ai-interview.css?v=20260928-demo">
 </head>
 <body>
   <div class="app-shell">
@@ -38,6 +38,8 @@
         <span class="workspace-location" id="workspaceLocation">面试工作台 / 准备资料</span>
         <span class="mode-pill" id="apiStatus" role="status" aria-live="polite"><i></i> 正在检查模型连接</span>
       </header>
+      <div class="demo-banner" id="demoBanner"><strong>演示模式 · 不消耗 Token</strong><p>虚构案例、预设追问与评分，用于展示产品流程，不分析你的个人回答。</p><div><button class="text-button" id="demoReport" type="button">查看完整示例报告</button><button class="text-button" id="liveMode" type="button">切换真实练习（需本地服务）</button></div></div>
+      <details class="project-about"><summary>项目说明与完成程度</summary><p>面向 AI 产品经理实习候选人，围绕简历证据和岗位要求设计针对性练习。作者负责需求分析、流程与评分规则、体验迭代，借助 AI 编程工具完成原型。核心设计是解释为什么追问，并区分事实、推断和未知结果。</p><p>当前支持完整预设演示；真实 DeepSeek 调用仅在本地后端运行时可用，尚未开展外部用户测试。</p><a href="https://github.com/buxianxian665/personal-portfolio" target="_blank" rel="noopener">查看项目源码</a></details>
 
       <section class="view is-visible" id="setupView" aria-labelledby="setupTitle">
         <div class="view-heading">
@@ -70,8 +72,8 @@
         </div>
 
         <div class="setup-actions">
-          <button class="text-button" id="loadSample" type="button">填入虚构示例，先试一下</button>
-          <button class="primary-button" id="analyzeButton" type="button">分析匹配关系 <span>→</span></button>
+          <button class="text-button" id="loadSample" type="button">重置虚构示例</button>
+          <button class="primary-button" id="analyzeButton" type="button">体验演示案例 <span>→</span></button>
         </div>
         <p class="mobile-privacy">输入会发送给模型完成分析；本项目服务端不持久化保存简历和回答。</p>
         <p class="form-error" id="formError" role="alert"></p>
@@ -83,6 +85,7 @@
       <section class="view" id="reportView" aria-labelledby="reportTitle"></section>
     </main>
   </div>
-  <script src="ai-interview.js?v=20260914-light"></script>
+  <script src="ai-interview-demo.js?v=20260928-demo"></script>
+  <script src="ai-interview.js?v=20260928-demo"></script>
 </body>
 </html>
