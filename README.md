@@ -1,5 +1,13 @@
 # AI 面试陪练 / AI Interview Coach
 
+## 公开网站
+
+个人网站：https://buxianxian665.github.io/ai-interview/
+
+面试陪练演示：https://buxianxian665.github.io/ai-interview/ai-interview.html
+
+推送到 `main` 后，GitHub Actions 自动发布静态网站。部署文件仅包含主页、面试演示及其静态资源，不包含本地环境配置、后端和私人资料目录。在线面试陪练使用演示模式，实时模型调用仍需本地后端。
+
 面向 AI 产品经理实习候选人的文本面试陪练。依据简历与 JD 生成针对性问题，以回答证据驱动追问、评分和改进建议，而不是随机聊天。
 
 ## 当前功能
